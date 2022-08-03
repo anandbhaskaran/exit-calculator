@@ -197,6 +197,7 @@ export const actions: ActionTree<StackingState, any> = {
     }
 
     function getRemainingValuation (exitValue:number, rounds: InvestmentRound) {
+    function getRemainingValuation (exitValue:number, rounds: InvestmentRound) {
       return exitValue -
         getComputedRounds(rounds).reduce((acc, obj) => { return acc + obj.valuation.preference.participationValue + obj.valuation.preference.profitValue.profit }, 0) -
         getRoundsToBeComputed(rounds).reduce((acc, obj) => { return acc + obj.valuation.preference.participationValue }, 0)
@@ -207,7 +208,6 @@ export const actions: ActionTree<StackingState, any> = {
     }
 
     do {
-      debugger
       anyRoundReachedCap = false
       const calculateProfit : InvestmentRound[] = []
       // @ts-ignore
