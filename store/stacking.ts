@@ -155,10 +155,6 @@ export const mutations: MutationTree<StackingState> = {
     state.investmentRounds[commonShareReturn.roundId].roundExitValuation = commonShareReturn.valuation
   },
   updateCapReached (state: StackingState, capStatus) {
-
-    // @ts-ignore
-    console.log(state.investmentRounds[capStatus.roundId].valuation.preference.profitValue)
-    console.log(capStatus)
     // @ts-ignore
     state.investmentRounds[capStatus.roundId].valuation.preference.profitValue.capReached = capStatus.value
   }
@@ -200,7 +196,6 @@ export const actions: ActionTree<StackingState, any> = {
     })
 
     function getProfitExitValuation (investmentRound: InvestmentRound, remainingValuation: number, remainingShares: number) {
-
       let profit = remainingValuation * (investmentRound.shares / remainingShares)
       // No return for non participating members
       if (investmentRound.liquidationPreference.participation === Participation.NON_PARTICIPATING_1X) {
@@ -251,7 +246,6 @@ export const actions: ActionTree<StackingState, any> = {
     }
 
     do {
-
       anyRoundReachedCap = false
       const calculateProfit: InvestmentRound[] = []
       // @ts-ignore
@@ -261,13 +255,12 @@ export const actions: ActionTree<StackingState, any> = {
       // @ts-ignore
       calculateProfit.push(...getRoundsToBeComputed(state.investmentRounds))
       calculateProfit.forEach((investmentRound) => {
-
         const profitExitValuation = getProfitExitValuation(investmentRound, remainingValuation, remainingShares)
         remainingValuation -= profitExitValuation.profit
         remainingShares -= investmentRound.shares
         commit('updateProfitReturn', {
           roundId: investmentRound.id,
-          valuation: profitExitValuation
+          valuation: profitExitValuation.profit
         })
 
         anyRoundReachedCap = anyRoundReachedCap || profitExitValuation.capReached
@@ -285,24 +278,20 @@ export const actions: ActionTree<StackingState, any> = {
     // Calculate the common share return and choose the best one
     Object.entries(state.investmentRounds).forEach(([roundId, investmentRound]) => {
       const commonShareExitValuation = getCommonShareReturn(investmentRound, commonShareRemainingValuation, commonShareRemainingShares)
-      commonShareRemainingValuation -= commonShareExitValuation
-      commonShareRemainingShares -= investmentRound.shares
+      const preferedExitValuation = investmentRound.valuation.preference.participationValue + investmentRound.valuation.preference.profitValue.profit
       commit('updateCommonShareReturn', {
         roundId,
         valuation: commonShareExitValuation
       })
-    })
 
-    // Choose the final return
-    // Calculate the common share return and choose the best one
-    Object.entries(state.investmentRounds).forEach(([roundId, investmentRound]) => {
       let finalReturn: number
-      if (investmentRound.valuation.preference.participationValue + investmentRound.valuation.preference.profitValue > investmentRound.valuation.commonShareValue) {
-        finalReturn = investmentRound.valuation.preference.participationValue + investmentRound.valuation.preference.profitValue
+      if (commonShareExitValuation > preferedExitValuation) {
+        commonShareRemainingValuation -= commonShareExitValuation
+        commonShareRemainingShares -= investmentRound.shares
+        finalReturn = commonShareExitValuation
       } else {
-        finalReturn = investmentRound.valuation.commonShareValue
+        finalReturn = preferedExitValuation
       }
-
       commit('updateFinalReturn', {
         roundId,
         valuation: finalReturn
