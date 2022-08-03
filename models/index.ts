@@ -15,6 +15,12 @@ export interface LiquidationPreference {
   cap: ProfitCap
 }
 
+export enum Decision {
+  UNKNOWN,
+  COMMON_SHARE,
+  EXIT
+}
+
 export enum Round {
   SERIES_C,
   SERIES_B,
@@ -24,6 +30,7 @@ export enum Round {
 
 export interface InvestmentRound {
   id: string,
+  round: Round,
   name: string,
   shares: number,
   investment: number,
@@ -39,7 +46,8 @@ export interface InvestmentRound {
     },
     commonShareValue: number
   },
-  roundExitValuation: number
+  roundExitValuation: number,
+  decision: Decision
 }
 
 export interface Calculated{

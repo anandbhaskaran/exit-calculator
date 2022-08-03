@@ -1,17 +1,17 @@
-import webpack, { debug } from 'webpack'
+import webpack from 'webpack'
 import { ActionTree, MutationTree } from 'vuex'
-import { Calculated, InvestmentRound, Participation, ProfitCap, Round } from '~/models'
+import { Calculated, Decision, InvestmentRound, Participation, ProfitCap, Round } from '~/models'
 import Record = webpack.compilation.Record
 
 export const state = () => ({
   investmentRounds: {
     [Round.SERIES_C]: {
       id: Round.SERIES_C,
+      round: Round.SERIES_C,
       name: 'Preferred C',
       shares: 1500000,
       investment: 15000000,
       priority: 40,
-      round: Round.SERIES_C,
       valuation: {
         preference: {
           participationValue: 0,
@@ -23,6 +23,7 @@ export const state = () => ({
         commonShareValue: 0
       },
       roundExitValuation: 0,
+      decision: Decision.UNKNOWN,
       liquidationPreference: {
         participation: Participation.PARTICIPATING_1X,
         cap: ProfitCap.CAPPED_2X
@@ -30,6 +31,7 @@ export const state = () => ({
     },
     [Round.SERIES_B]: {
       id: Round.SERIES_B,
+      round: Round.SERIES_B,
       name: 'Preferred B',
       shares: 300000,
       investment: 2100000,
@@ -45,6 +47,7 @@ export const state = () => ({
         commonShareValue: 0
       },
       roundExitValuation: 0,
+      decision: Decision.UNKNOWN,
       liquidationPreference: {
         participation: Participation.PARTICIPATING_1X,
         cap: ProfitCap.CAPPED_2X
@@ -52,6 +55,7 @@ export const state = () => ({
     },
     [Round.SERIES_A]: {
       id: Round.SERIES_A,
+      round: Round.SERIES_A,
       name: 'Preferred A',
       shares: 200000,
       investment: 900000,
@@ -67,6 +71,7 @@ export const state = () => ({
         commonShareValue: 0
       },
       roundExitValuation: 0,
+      decision: Decision.UNKNOWN,
       liquidationPreference: {
         participation: Participation.PARTICIPATING_1X,
         cap: ProfitCap.CAPPED_2X
@@ -74,6 +79,7 @@ export const state = () => ({
     },
     [Round.COMMON]: {
       id: Round.COMMON,
+      round: Round.COMMON,
       name: 'Common',
       shares: 1000000,
       investment: 0,
@@ -89,6 +95,7 @@ export const state = () => ({
         commonShareValue: 0
       },
       roundExitValuation: 0,
+      decision: Decision.UNKNOWN,
       liquidationPreference: {
         participation: Participation.DEFAULT,
         cap: ProfitCap.UNCAPPED
@@ -129,7 +136,8 @@ export const mutations: MutationTree<StackingState> = {
           },
           commonShareValue: 0
         },
-        roundExitValuation: 0
+        roundExitValuation: 0,
+        decision: Decision.UNKNOWN
       })
       totalInvested += value.investment
       totalShares += value.shares
@@ -150,9 +158,11 @@ export const mutations: MutationTree<StackingState> = {
     // @ts-ignore
     state.investmentRounds[commonShareReturn.roundId].valuation.commonShareValue = commonShareReturn.valuation
   },
-  updateFinalReturn (state: StackingState, commonShareReturn) {
+  updateFinalReturn (state: StackingState, finalShareReturn) {
     // @ts-ignore
-    state.investmentRounds[commonShareReturn.roundId].roundExitValuation = commonShareReturn.valuation
+    state.investmentRounds[finalShareReturn.roundId].roundExitValuation = finalShareReturn.valuation
+    // @ts-ignore
+    state.investmentRounds[finalShareReturn.roundId].decision = finalShareReturn.decision
   },
   updateCapReached (state: StackingState, capStatus) {
     // @ts-ignore
@@ -164,13 +174,13 @@ export const actions: ActionTree<StackingState, any> = {
   calculateExit ({
     commit,
     state
-  }, exitValuation: number) {
+  }, exitValuationString: string) {
     commit('computeCalculated')
     commit('reset')
 
-    let remainingValuation = exitValuation
     let remainingShares = state.calculated.totalShares
-
+    const exitValuation = parseFloat(exitValuationString)
+    let remainingValuation = exitValuation
     function getBaseReturn (investmentRound: InvestmentRound, remainingValuation: number) {
       let baseValue: number = 0
       if (investmentRound.liquidationPreference.participation === Participation.NON_PARTICIPATING_1X ||
@@ -274,28 +284,74 @@ export const actions: ActionTree<StackingState, any> = {
       return commonShareRemainingValuation * (investmentRound.shares / commonShareRemainingShares)
     }
 
-    // Assuming state.investmentRounds is sorted based on the priority
-    // Calculate the common share return and choose the best one
-    Object.entries(state.investmentRounds).forEach(([roundId, investmentRound]) => {
-      const commonShareExitValuation = getCommonShareReturn(investmentRound, commonShareRemainingValuation, commonShareRemainingShares)
-      const preferedExitValuation = investmentRound.valuation.preference.participationValue + investmentRound.valuation.preference.profitValue.profit
-      commit('updateCommonShareReturn', {
-        roundId,
-        valuation: commonShareExitValuation
-      })
+    let anyRoundExited = false
 
-      let finalReturn: number
-      if (commonShareExitValuation > preferedExitValuation) {
-        commonShareRemainingValuation -= commonShareExitValuation
-        commonShareRemainingShares -= investmentRound.shares
-        finalReturn = commonShareExitValuation
-      } else {
-        finalReturn = preferedExitValuation
+    function getProspectiveTotalCommonRounds (rounds: InvestmentRound) {
+      return Object.values(rounds).filter((round: InvestmentRound) => round.decision === Decision.UNKNOWN || round.decision === Decision.COMMON_SHARE)
+    }
+
+    function getExitedRounds (rounds: InvestmentRound) {
+      return Object.values(rounds).filter((round: InvestmentRound) => round.decision === Decision.EXIT)
+    }
+
+    function getUncomputedCommonRounds (rounds: InvestmentRound) : InvestmentRound[] {
+      return Object.values(rounds).filter((round: InvestmentRound) => round.decision === Decision.UNKNOWN)
+    }
+
+    function getProspectiveTotalCommonShares (investmentRounds: webpack.compilation.Record) {
+      // @ts-ignore
+      return getProspectiveTotalCommonRounds(investmentRounds).reduce((acc, obj) => {
+        return acc + obj.shares
+      }, 0)
+    }
+
+    function getProspectiveTotalValuvation (exitValuation: number, investmentRounds: webpack.compilation.Record) {
+      // @ts-ignore
+      return exitValuation - getExitedRounds(investmentRounds).reduce((acc, obj) => {
+        return acc + obj.valuation.preference.profitValue.profit + obj.valuation.preference.participationValue
+      }, 0)
+    }
+
+    do {
+      // debugger
+      anyRoundExited = false
+      commonShareRemainingShares = getProspectiveTotalCommonShares(state.investmentRounds)
+      commonShareRemainingValuation = getProspectiveTotalValuvation(exitValuation, state.investmentRounds)
+      // Assuming state.investmentRounds is sorted based on the priority
+      // Calculate the common share return and choose the best one
+      // @ts-ignore
+      for (const investmentRound of getUncomputedCommonRounds(state.investmentRounds)) {
+        const commonShareExitValuation = getCommonShareReturn(investmentRound, commonShareRemainingValuation, commonShareRemainingShares)
+        const preferredExitValuation = investmentRound.valuation.preference.participationValue + investmentRound.valuation.preference.profitValue.profit
+        commit('updateCommonShareReturn', {
+          roundId: investmentRound.id,
+          valuation: commonShareExitValuation
+        })
+
+        let finalReturn: number
+        let decision: Decision
+        if (commonShareExitValuation >= preferredExitValuation || investmentRound.round === Round.COMMON) {
+          commonShareRemainingShares -= investmentRound.shares
+          finalReturn = commonShareExitValuation
+          decision = Decision.COMMON_SHARE
+        } else {
+          finalReturn = preferredExitValuation
+          anyRoundExited = true
+          decision = Decision.EXIT
+          commit('updateFinalReturn', {
+            roundId: investmentRound.id,
+            valuation: finalReturn,
+            decision
+          })
+          break
+        }
+        commonShareRemainingValuation -= finalReturn
+        commit('updateFinalReturn', {
+          roundId: investmentRound.id,
+          valuation: finalReturn,
+          decision
+        })
       }
-      commit('updateFinalReturn', {
-        roundId,
-        valuation: finalReturn
-      })
-    })
+    } while (anyRoundExited)
   }
 }

@@ -49,11 +49,11 @@
                   <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                     {{ getInEuro(investmentRound.investment) }}
                   </td>
-                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500" :class="investmentRound.decision === 2 ? 'bg-blue-100' : undefined">
                     {{ getInEuro(investmentRound.valuation.preference.participationValue) }} + {{ getInEuro(investmentRound.valuation.preference.profitValue.profit) }} ({{ investmentRound.valuation.preference.profitValue.capReached?"2X":"" }}) =
                     {{ getInEuro(investmentRound.valuation.preference.participationValue + investmentRound.valuation.preference.profitValue.profit) }}
                   </td>
-                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500" :class="investmentRound.decision === 1 ? 'bg-blue-100' : undefined">
                     {{ getInEuro(investmentRound.valuation.commonShareValue) }}
                   </td>
                   <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
