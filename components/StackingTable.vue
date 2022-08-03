@@ -77,12 +77,13 @@ export default {
   },
   methods: {
     getInEuro (value: number) {
+      value /= 1000000
       const formatter = new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: 'EUR',
         minimumFractionDigits: 2
       })
-      return formatter.format(value)
+      return formatter.format(value) + 'm'
     }
   }
 }

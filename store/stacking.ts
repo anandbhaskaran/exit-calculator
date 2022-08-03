@@ -1,4 +1,4 @@
-import webpack from 'webpack'
+import webpack, { debug } from 'webpack'
 import { ActionTree, MutationTree } from 'vuex'
 import { Calculated, InvestmentRound, Participation, ProfitCap, Round } from '~/models'
 import Record = webpack.compilation.Record
@@ -15,8 +15,10 @@ export const state = () => ({
       valuation: {
         preference: {
           participationValue: 0,
-          profitValue: 0,
-          capReached: false
+          profitValue: {
+            profit: 0,
+            capReached: false
+          }
         },
         commonShareValue: 0
       },
@@ -35,8 +37,10 @@ export const state = () => ({
       valuation: {
         preference: {
           participationValue: 0,
-          profitValue: 0,
-          capReached: false
+          profitValue: {
+            profit: 0,
+            capReached: false
+          }
         },
         commonShareValue: 0
       },
@@ -55,8 +59,10 @@ export const state = () => ({
       valuation: {
         preference: {
           participationValue: 0,
-          profitValue: 0,
-          capReached: false
+          profitValue: {
+            profit: 0,
+            capReached: false
+          }
         },
         commonShareValue: 0
       },
@@ -75,8 +81,10 @@ export const state = () => ({
       valuation: {
         preference: {
           participationValue: 0,
-          profitValue: 0,
-          capReached: false
+          profitValue: {
+            profit: 0,
+            capReached: false
+          }
         },
         commonShareValue: 0
       },
@@ -100,7 +108,7 @@ export const getters = {
     return state.investmentRounds
   },
   roundsToBeComputed (state: StackingState) {
-    return Object.values(state.investmentRounds).filter((round: InvestmentRound) => round.liquidationPreference.participation !== Participation.NON_PARTICIPATING_1X && !round.valuation.preference.capReached)
+    return Object.values(state.investmentRounds).filter((round: InvestmentRound) => round.liquidationPreference.participation !== Participation.NON_PARTICIPATING_1X && !round.valuation.preference.profitValue.capReached)
   }
 }
 export const mutations: MutationTree<StackingState> = {
@@ -110,7 +118,19 @@ export const mutations: MutationTree<StackingState> = {
     // Count the total
     Object.entries(state.investmentRounds).forEach(([key, value]) => {
       // @ts-ignore
-      state.investmentRounds[key].roundExitValuation = 0
+      Object.assign(state.investmentRounds[key], {
+        valuation: {
+          preference: {
+            participationValue: 0,
+            profitValue: {
+              profit: 0,
+              capReached: false
+            }
+          },
+          commonShareValue: 0
+        },
+        roundExitValuation: 0
+      })
       totalInvested += value.investment
       totalShares += value.shares
     })
@@ -124,7 +144,7 @@ export const mutations: MutationTree<StackingState> = {
   },
   updateProfitReturn (state: StackingState, profitReturn) {
     // @ts-ignore
-    state.investmentRounds[profitReturn.roundId].valuation.preference.profitValue = profitReturn.valuation
+    state.investmentRounds[profitReturn.roundId].valuation.preference.profitValue.profit = profitReturn.valuation
   },
   updateCommonShareReturn (state: StackingState, commonShareReturn) {
     // @ts-ignore
@@ -135,8 +155,12 @@ export const mutations: MutationTree<StackingState> = {
     state.investmentRounds[commonShareReturn.roundId].roundExitValuation = commonShareReturn.valuation
   },
   updateCapReached (state: StackingState, capStatus) {
+
     // @ts-ignore
-    state.investmentRounds[capStatus.roundId].valuation.preference.capReached = capStatus.value
+    console.log(state.investmentRounds[capStatus.roundId].valuation.preference.profitValue)
+    console.log(capStatus)
+    // @ts-ignore
+    state.investmentRounds[capStatus.roundId].valuation.preference.profitValue.capReached = capStatus.value
   }
 }
 
@@ -146,6 +170,7 @@ export const actions: ActionTree<StackingState, any> = {
     state
   }, exitValuation: number) {
     commit('computeCalculated')
+    commit('reset')
 
     let remainingValuation = exitValuation
     let remainingShares = state.calculated.totalShares
@@ -175,6 +200,7 @@ export const actions: ActionTree<StackingState, any> = {
     })
 
     function getProfitExitValuation (investmentRound: InvestmentRound, remainingValuation: number, remainingShares: number) {
+
       let profit = remainingValuation * (investmentRound.shares / remainingShares)
       // No return for non participating members
       if (investmentRound.liquidationPreference.participation === Participation.NON_PARTICIPATING_1X) {
@@ -199,13 +225,13 @@ export const actions: ActionTree<StackingState, any> = {
     }
 
     function getRoundsToBeComputed (rounds: InvestmentRound) {
-      return Object.values(rounds).filter((round: InvestmentRound) => round.liquidationPreference.participation !== Participation.NON_PARTICIPATING_1X && !round.valuation.preference.capReached)
+      return Object.values(rounds).filter((round: InvestmentRound) => round.liquidationPreference.participation !== Participation.NON_PARTICIPATING_1X && !round.valuation.preference.profitValue.capReached)
     }
 
     let anyRoundReachedCap = false
 
     function getComputedRounds (rounds: InvestmentRound) {
-      return Object.values(rounds).filter((round: InvestmentRound) => round.liquidationPreference.participation === Participation.NON_PARTICIPATING_1X || round.valuation.preference.capReached)
+      return Object.values(rounds).filter((round: InvestmentRound) => round.liquidationPreference.participation === Participation.NON_PARTICIPATING_1X || round.valuation.preference.profitValue.capReached)
     }
 
     function getRemainingValuation (exitValue: number, rounds: InvestmentRound) {
@@ -225,6 +251,7 @@ export const actions: ActionTree<StackingState, any> = {
     }
 
     do {
+
       anyRoundReachedCap = false
       const calculateProfit: InvestmentRound[] = []
       // @ts-ignore
@@ -234,6 +261,7 @@ export const actions: ActionTree<StackingState, any> = {
       // @ts-ignore
       calculateProfit.push(...getRoundsToBeComputed(state.investmentRounds))
       calculateProfit.forEach((investmentRound) => {
+
         const profitExitValuation = getProfitExitValuation(investmentRound, remainingValuation, remainingShares)
         remainingValuation -= profitExitValuation.profit
         remainingShares -= investmentRound.shares

@@ -32,8 +32,10 @@ export interface InvestmentRound {
   valuation: {
     preference: {
       participationValue: number,
-      profitValue: number,
-      capReached: boolean
+       profitValue: {
+         profit: number,
+         capReached: false
+       }
     },
     commonShareValue: number
   },
