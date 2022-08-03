@@ -141,7 +141,10 @@ export const mutations: MutationTree<StackingState> = {
 }
 
 export const actions: ActionTree<StackingState, any> = {
-  calculateExit ({ commit, state }, exitValuation: number) {
+  calculateExit ({
+    commit,
+    state
+  }, exitValuation: number) {
     commit('computeCalculated')
 
     let remainingValuation = exitValuation
@@ -165,7 +168,10 @@ export const actions: ActionTree<StackingState, any> = {
     Object.entries(state.investmentRounds).forEach(([roundId, value]) => {
       const baseExitValuation = getBaseReturn(value, remainingValuation)
       remainingValuation -= baseExitValuation
-      commit('updateParticipationReturn', { roundId, valuation: baseExitValuation })
+      commit('updateParticipationReturn', {
+        roundId,
+        valuation: baseExitValuation
+      })
     })
 
     function getProfitExitValuation (investmentRound: InvestmentRound, remainingValuation: number, remainingShares: number) {
@@ -180,10 +186,16 @@ export const actions: ActionTree<StackingState, any> = {
       if (investmentRound.liquidationPreference.cap === ProfitCap.CAPPED_2X &&
         investmentRound.valuation.preference.participationValue + profit > investmentRound.investment * 2) {
         capReached = true
-        commit('updateCapReached', { roundId: investmentRound.id, value: capReached })
+        commit('updateCapReached', {
+          roundId: investmentRound.id,
+          value: capReached
+        })
         profit = investmentRound.investment * 2 - investmentRound.valuation.preference.participationValue
       }
-      return { profit, capReached }
+      return {
+        profit,
+        capReached
+      }
     }
 
     function getRoundsToBeComputed (rounds: InvestmentRound) {
@@ -196,20 +208,25 @@ export const actions: ActionTree<StackingState, any> = {
       return Object.values(rounds).filter((round: InvestmentRound) => round.liquidationPreference.participation === Participation.NON_PARTICIPATING_1X || round.valuation.preference.capReached)
     }
 
-    function getRemainingValuation (exitValue:number, rounds: InvestmentRound) {
-    function getRemainingValuation (exitValue:number, rounds: InvestmentRound) {
+    function getRemainingValuation (exitValue: number, rounds: InvestmentRound) {
       return exitValue -
-        getComputedRounds(rounds).reduce((acc, obj) => { return acc + obj.valuation.preference.participationValue + obj.valuation.preference.profitValue.profit }, 0) -
-        getRoundsToBeComputed(rounds).reduce((acc, obj) => { return acc + obj.valuation.preference.participationValue }, 0)
+          getComputedRounds(rounds).reduce((acc, obj) => {
+            return acc + obj.valuation.preference.participationValue + obj.valuation.preference.profitValue.profit
+          }, 0) -
+          getRoundsToBeComputed(rounds).reduce((acc, obj) => {
+            return acc + obj.valuation.preference.participationValue
+          }, 0)
     }
 
     function getRemainingShares (rounds: InvestmentRound) {
-      return getRoundsToBeComputed(rounds).reduce((acc, obj) => { return acc + obj.shares }, 0)
+      return getRoundsToBeComputed(rounds).reduce((acc, obj) => {
+        return acc + obj.shares
+      }, 0)
     }
 
     do {
       anyRoundReachedCap = false
-      const calculateProfit : InvestmentRound[] = []
+      const calculateProfit: InvestmentRound[] = []
       // @ts-ignore
       remainingValuation = getRemainingValuation(exitValuation, state.investmentRounds)
       // @ts-ignore
@@ -231,7 +248,8 @@ export const actions: ActionTree<StackingState, any> = {
 
     let commonShareRemainingValuation = exitValuation
     let commonShareRemainingShares = state.calculated.totalShares
-    function getCommonShareReturn (investmentRound: InvestmentRound, commonShareRemainingValuation: number, commonShareRemainingShares:number) {
+
+    function getCommonShareReturn (investmentRound: InvestmentRound, commonShareRemainingValuation: number, commonShareRemainingShares: number) {
       return commonShareRemainingValuation * (investmentRound.shares / commonShareRemainingShares)
     }
 
@@ -241,7 +259,10 @@ export const actions: ActionTree<StackingState, any> = {
       const commonShareExitValuation = getCommonShareReturn(investmentRound, commonShareRemainingValuation, commonShareRemainingShares)
       commonShareRemainingValuation -= commonShareExitValuation
       commonShareRemainingShares -= investmentRound.shares
-      commit('updateCommonShareReturn', { roundId, valuation: commonShareExitValuation })
+      commit('updateCommonShareReturn', {
+        roundId,
+        valuation: commonShareExitValuation
+      })
     })
 
     // Choose the final return
@@ -254,7 +275,10 @@ export const actions: ActionTree<StackingState, any> = {
         finalReturn = investmentRound.valuation.commonShareValue
       }
 
-      commit('updateFinalReturn', { roundId, valuation: finalReturn })
+      commit('updateFinalReturn', {
+        roundId,
+        valuation: finalReturn
+      })
     })
   }
 }
